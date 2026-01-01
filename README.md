@@ -11,5 +11,7 @@
 2. 
 
 ## プログラム解説
-### server_app_ver2.py
-### turntable_control.py
+### main_raspi.py
+- 
+### module_turntable_control.py
+- モータの各処理を担当するmodule
