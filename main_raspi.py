@@ -6,7 +6,7 @@ import signal
 import sys
 import subprocess
 from flask import Flask, jsonify
-from turntable_control import MotorController
+from module_turntable_control import MotorController
 
 # ==========================================================
 # 変数定義
