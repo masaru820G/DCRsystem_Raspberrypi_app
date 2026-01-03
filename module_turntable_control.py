@@ -6,9 +6,25 @@ import time
 import threading
 
 # ==========================================================
+# 設定: PCから送られるスピード値(1-10) と パルス幅の対応表
+# ==========================================================
+# レベル5 (0.0006) を基準に、0.0001ずつ増減させる
+SPEED_MAP = {
+    1: 0.0010,  #   回転遅い
+    2: 0.0009,
+    3: 0.0008,
+    4: 0.0007,
+    5: 0.0006,  # 基準 (デフォルト)
+    6: 0.0005,
+    7: 0.0004,
+    8: 0.0003,
+    9: 0.0002,
+    10: 0.0001  # 回転速い
+}
+# ==========================================================
 # モーター制御クラス
 # ==========================================================
-class MotorController:
+class MotorController():
     def __init__(self):
         # GPIO設定 BCM ：コネクタのピン番号を使用
         GPIO.setmode(GPIO.BCM)
@@ -25,8 +41,7 @@ class MotorController:
         #GPIO.setup(self.ENA_pin, GPIO.OUT, initial=GPIO.LOW)
 
         # パルスの幅を指定。値が小さいほど高速回転
-        self.DEFAULT_DELAY = 0.0006   # 基準になるパルス幅
-        self.new_delay = 0.0006     # ボタンにより変わるパルス幅
+        self.current_pulse_delay = SPEED_MAP[5]     # ボタンにより変わるパルス幅
 
         self.is_running = False    # モーターの「停止フラグ」 回転を継続中かどうか
         self.motor_thread = None   # スレッドを格納する変数
@@ -44,9 +59,9 @@ class MotorController:
     # --- 1ステップ関数 --------------------------------------
     def _one_step(self):
         GPIO.output(self.PUL_pin, GPIO.LOW)
-        time.sleep(self.new_delay)
+        time.sleep(self.current_pulse_delay)
         GPIO.output(self.PUL_pin, GPIO.HIGH)
-        time.sleep(self.new_delay)
+        time.sleep(self.current_pulse_delay)
 
 
     # --- モータループ関数 --------------------------------------
@@ -89,23 +104,17 @@ class MotorController:
         self.motor_thread.join() # スレッドの終了を待つ
 
 
-    # --- delayを設定する関数群 --------------------------------------
-    def change_speed_pls(self):
-        self.new_delay = self.new_delay - 0.0001
-        print(f"MotorController: 速度を {self.new_delay} に変更しました。")
-    def change_speed_mns(self):
-        self.new_delay = self.new_delay + 0.0001
-        print(f"MotorController: 速度を {self.new_delay} に変更しました。")
-    def change_speed_def(self):
-        self.new_delay = self.DEFAULT_DELAY
-        print(f"MotorController: 速度を {self.new_delay} に変更しました。")
+    # --- delayを設定する関数 --------------------------------------
+    def set_speed(self, current_speed):
+        self.current_pulse_delay = SPEED_MAP[current_speed]
+        print(f"MotorController: 速度を {self.current_pulse_delay} に変更しました。")
 
 
     # --- 今のステータスを表示する関数 --------------------------------------
     def get_status(self):
         return {
             "motor_is_running": self.is_running,
-            "current_speed_delay": self.new_delay,
+            "current_speed_delay": self.current_pulse_delay,
         }
 
 

@@ -9,4 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-# Python files
+# Folder
+unsused_files/
+sample_move_check/

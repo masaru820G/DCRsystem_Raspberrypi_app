@@ -47,32 +47,11 @@ def handle_stop():
     return "OK: モーターを停止します。", 200
 
 # ==========================================================
-# [/status] モータの状況を確認させる命令
+# [/set_speed] GUIから指定された速度に変更する命令
 # ==========================================================
-@app.route('/status')
-def handle_status():
-    return jsonify(motor.get_status())
-
-# ==========================================================
-# [/plus_speed] モータを速く回転させる命令（delayを短く）
-# ==========================================================
-@app.route('/plus_speed')
-def handle_plus_speed():
-    motor.change_speed_pls()
-
-# ==========================================================
-# [/minus_speed] モータを遅く回転させる命令（delayを長く）
-# ==========================================================
-@app.route('/minus_speed')
-def handle_minus_speed():
-    motor.change_speed_mns()
-
-# ==========================================================
-# [/default_speed] モータをdefaultスピードに戻す関数
-# ==========================================================
-@app.route('/default_speed')
-def handle_default_speed():
-    motor.change_speed_def()
+@app.route('/set_speed/<int:speed>')
+def handle_set_speed(speed):
+    motor.set_speed(speed)
 
 # ==========================================================
 # [/system_shutdown] ラズパイ自体をシャットダウンする命令
