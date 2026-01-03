@@ -10,5 +10,5 @@ wheels/
 .venv
 
 # Folder
-unsused_files/
+unused_files/
 sample_move_check/
