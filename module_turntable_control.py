@@ -25,11 +25,11 @@ SPEED_MAP = {
 # モーター制御クラス
 # ==========================================================
 class MotorController():
-    def _init(self):
+    def __init__(self):
         GPIO.setmode(GPIO.BCM)  # GPIO設定 BCM ：コネクタのピン番号を使用
         # --- クラス内変数定義 --------------------------------------
         # GPIOピン設定
-        self.PUL_pin = 17
+        self.PUL_pin = 27
         #self.ENA_pin = 18
 
         # GPIOセットアップ設定
@@ -50,6 +50,12 @@ class MotorController():
         GPIO.output(self.ENA_pin, GPIO.HIGH if enable else GPIO.LOW)
     """
 
+    # --- セットアップ関数 --------------------------------------
+    def _setup_gpio(self):
+        GPIO.setmode(GPIO.BCM)  # GPIO設定 BCM ：コネクタのピン番号を使用
+        self.PUL_pin = 27
+        GPIO.setup(self.PUL_pin, GPIO.OUT, initial=GPIO.LOW)
+
     # --- 1ステップ関数 --------------------------------------
     def _one_step(self):
         GPIO.output(self.PUL_pin, GPIO.LOW)
@@ -62,14 +68,14 @@ class MotorController():
         """
         [スレッド専用] is_runningフラグがTrueの間、回転し続ける
         """
-        print("【MotorThread】: 開始。モーターを有効化します。")
+        #print("【MotorThread】: 開始。モーターを有効化します。")
         #self._motor_enable(True)
 
         # self.is_running が True の間だけループ(停止フラグ)
         while self.is_running:
             self._one_step()
 
-        print("【MotorThread】: 終了。モーターを無効化します。")
+        #print("【MotorThread】: 終了。モーターを無効化します。")
         #self._motor_enable(False)
 
         self.is_running = False  # 絶対に is_running を False に戻す
@@ -77,9 +83,9 @@ class MotorController():
     # --- モータを回転させる関数 --------------------------------------
     def start_rotation(self):
         try:
-            GPIO.getmode()
-        except:
-            self._init()
+            self._setup_gpio()
+        except Exception as e:
+            print(f"GPIO Setup Warning: {e}")
 
         if self.is_running: # TrueやFalseといったbool値は ==Trueを省略するのが一般的
             print("MotorController: 既に回転中です。")
