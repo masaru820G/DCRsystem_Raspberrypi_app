@@ -25,18 +25,14 @@ SPEED_MAP = {
 # モーター制御クラス
 # ==========================================================
 class MotorController():
-    def __init__(self):
-        # GPIO設定 BCM ：コネクタのピン番号を使用
-        GPIO.setmode(GPIO.BCM)
+    def _init(self):
+        GPIO.setmode(GPIO.BCM)  # GPIO設定 BCM ：コネクタのピン番号を使用
         # --- クラス内変数定義 --------------------------------------
         # GPIOピン設定
-        #self.DIR_pin = 15
         self.PUL_pin = 17
         #self.ENA_pin = 18
 
         # GPIOセットアップ設定
-        #GPIO.setup(self.DIR_pin, GPIO.OUT, initial=GPIO.LOW)
-        #GPIO.output(self.DIR_pin, 0) # DIR=LOW -> 反時計回り
         GPIO.setup(self.PUL_pin, GPIO.OUT, initial=GPIO.LOW)
         #GPIO.setup(self.ENA_pin, GPIO.OUT, initial=GPIO.LOW)
 
@@ -80,6 +76,11 @@ class MotorController():
 
     # --- モータを回転させる関数 --------------------------------------
     def start_rotation(self):
+        try:
+            GPIO.getmode()
+        except:
+            self._init()
+
         if self.is_running: # TrueやFalseといったbool値は ==Trueを省略するのが一般的
             print("MotorController: 既に回転中です。")
             return False # 既に動いているという報告をするだけ
