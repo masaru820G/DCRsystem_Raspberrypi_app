@@ -43,8 +43,10 @@ def handle_rotate():
 # ==========================================================
 @app.route('/stop')
 def handle_stop():
-    motor.stop_rotation()
-    return "OK: モーターを停止します。", 200
+    success = motor.stop_rotation()
+    if success:
+        return "OK: モーターを停止します。", 200
+    return "Error: 既に停止中です。", 400
 
 # ==========================================================
 # [/set_speed] GUIから指定された速度に変更する命令
@@ -52,6 +54,19 @@ def handle_stop():
 @app.route('/set_speed/<int:speed>')
 def handle_set_speed(speed):
     motor.set_speed(speed)
+    return "OK: 速度変更が完了しました", 200
+
+# ==========================================================
+# [/cleanup_system] 終了処理を行う命令
+# ==========================================================
+@app.route('/cleanup_system')
+def handle_cleanup():
+    try:
+        motor.cleanup()
+        print("システムを終了しました")
+        return "OK: システムを終了します。", 200
+    except Exception as e:
+        return f"Error: システム終了に失敗しました。{str(e)}", 500
 
 # ==========================================================
 # [/system_shutdown] ラズパイ自体をシャットダウンする命令

@@ -48,13 +48,11 @@ class MotorController():
 
         print("MotorController: 初期化完了。")
 
-
     """
     # --- モーター有効化/無効化関数 --------------------------------------
     def _motor_enable(self, enable=True):   #デフォルト引数: 引数を何も指定せずに呼び出したらenable=Trueとする
         GPIO.output(self.ENA_pin, GPIO.HIGH if enable else GPIO.LOW)
     """
-
 
     # --- 1ステップ関数 --------------------------------------
     def _one_step(self):
@@ -62,7 +60,6 @@ class MotorController():
         time.sleep(self.current_pulse_delay)
         GPIO.output(self.PUL_pin, GPIO.HIGH)
         time.sleep(self.current_pulse_delay)
-
 
     # --- モータループ関数 --------------------------------------
     def _motor_loop(self):
@@ -81,7 +78,6 @@ class MotorController():
 
         self.is_running = False  # 絶対に is_running を False に戻す
 
-
     # --- モータを回転させる関数 --------------------------------------
     def start_rotation(self):
         if self.is_running: # TrueやFalseといったbool値は ==Trueを省略するのが一般的
@@ -93,30 +89,21 @@ class MotorController():
         self.motor_thread.start()
         return True
 
-
     # --- モータを停止させる関数 --------------------------------------
     def stop_rotation(self):
         if not self.is_running: # TrueやFalseといったbool値は notをつけるのが一般的
             print("MotorController: 既に停止しています。")
-            return
+            return False
         print("MotorController: 停止フラグを立てます。")
         self.is_running = False # 停止フラグを False に
         self.motor_thread.join() # スレッドの終了を待つ
-
+        return True
 
     # --- delayを設定する関数 --------------------------------------
     def set_speed(self, current_speed):
         self.current_pulse_delay = SPEED_MAP[current_speed]
         print(f"MotorController: 速度を {self.current_pulse_delay} に変更しました。")
-
-
-    # --- 今のステータスを表示する関数 --------------------------------------
-    def get_status(self):
-        return {
-            "motor_is_running": self.is_running,
-            "current_speed_delay": self.current_pulse_delay,
-        }
-
+        return True
 
     # --- GPIOをクリーンアップする関数 --------------------------------------
     def cleanup(self):
@@ -124,3 +111,4 @@ class MotorController():
         self.stop_rotation() # 念のためモーターを止める
         time.sleep(0.1) # スレッドが止まるのを少し待つ
         GPIO.cleanup()
+        return True
