@@ -1,31 +1,30 @@
-import RPi.GPIO as GPIO
-import time
-#import alert
-import threading
+import pigpio
 
 class MotorController:
     """
-    モーターの制御ロジック（ハードウェア、スレッド、状態）をすべてカプセル化（ひとまとめに）するクラス。
-    ※ _motor_loopのようなアンダーバーで始まる関数は、このクラス内部だけで扱う、Flaskからは直接呼ばないでという目印
+    モーターの制御ロジック（ハードウェア、状態）をすべてカプセル化するクラス。
+    pigpioのWave generation（DMAタイマー）を使用することで、
+    OSスケジューラーに依存しない正確なパルスを生成し、異音を防ぐ。
+    ※ _で始まる関数はクラス内部専用（Flaskから直接呼ばない）
     """
     def __init__(self):
-        # --- GPIO設定 ---
-        # ピン番号の割当方式を「コネクタのピン番号」に設定
-        # BCM ：コネクタのピン番号を使用
-        # BOARD：物理的なピン番号を使用
-        GPIO.setmode(GPIO.BCM)
+        self.pi = pigpio.pi()
+        if not self.pi.connected:
+            raise RuntimeError("pigpioデーモンに接続できません。ラズパイで 'sudo pigpiod' を実行してください。")
 
-        #GPIOピン設定
+        # GPIOピン設定（BCMピン番号）
         self.DIR_pin = 15
         self.PUL_pin = 17
         self.ENA_pin = 18
 
-        GPIO.setup(self.DIR_pin, GPIO.OUT, initial=GPIO.LOW)
-        GPIO.setup(self.PUL_pin, GPIO.OUT, initial=GPIO.LOW)
-        GPIO.setup(self.ENA_pin, GPIO.OUT, initial=GPIO.LOW)
-        GPIO.output(self.DIR_pin, 0) # DIR=LOW -> 反時計回り
+        self.pi.set_mode(self.DIR_pin, pigpio.OUTPUT)
+        self.pi.set_mode(self.PUL_pin, pigpio.OUTPUT)
+        self.pi.set_mode(self.ENA_pin, pigpio.OUTPUT)
 
-        # --- 状態管理変数 ---
+        self.pi.write(self.DIR_pin, 0)  # DIR=LOW -> 反時計回り
+        self.pi.write(self.PUL_pin, 0)
+        self.pi.write(self.ENA_pin, 0)
+
         # パルスの幅を指定。値が小さいほど高速回転
         # self.motor_delay = 0.0004  # 速い
         # self.motor_delay = 0.0006  # 普通
@@ -35,81 +34,84 @@ class MotorController:
         1回転あたりのパルス数[回](cnt) = (ratio = 1) * (360 / 1.8) * MICRO_status
         1回転あたりにかかる時間[s](T) = t * cnt
         '''
-        self.is_running = False    # モーターの「停止フラグ」 回転を継続中かどうか
-        self.motor_thread = None   # スレッドを格納する変数
+        self.is_running = False
+        self._wave_id = -1  # 現在再生中のwave ID（-1は未生成）
 
         print("MotorController: 初期化完了。")
 
-    def _motor_enable(self, enable=True):   #デフォルト引数: 引数を何も指定せずに呼び出したらenable=Trueとする
-        GPIO.output(self.ENA_pin, GPIO.HIGH if enable else GPIO.LOW)
+    def _motor_enable(self, enable=True):
+        self.pi.write(self.ENA_pin, 1 if enable else 0)
 
-    def _one_step(self):
-        GPIO.output(self.PUL_pin, GPIO.LOW)
-        time.sleep(self.motor_delay)
-        GPIO.output(self.PUL_pin, GPIO.HIGH)
-        time.sleep(self.motor_delay)
-
-    def _motor_loop(self):
+    def _create_wave(self):
         """
-        [スレッド専用] is_runningフラグがTrueの間、回転し続ける
+        現在のmotor_delayに基づいてDMAパルス波形を生成する。
+        pigpioのwave generationはDMAで動作するため、CPUやOSの負荷に関係なく
+        正確な周期でパルスを出力できる。
         """
-        print("【MotorThread】: 開始。モーターを有効化します。")
-        self._motor_enable(True)
+        half_period_us = int(self.motor_delay * 1_000_000)  # 秒→マイクロ秒
 
-        # self.is_running が True の間だけループ(停止フラグ)
-        while self.is_running:
-            #if alert.is_overheat(alert_temp=60.0):
-            #    print("【MotorThread】: 高温のため自動停止します。")
-            #    break
-
-            self._one_step()
-
-        print("【MotorThread】: 終了。モーターを無効化します。")
-        self._motor_enable(False)
-
-        self.is_running = False  # 絶対に is_running を False に戻す
+        self.pi.wave_clear()
+        pulses = [
+            pigpio.pulse(1 << self.PUL_pin, 0,              half_period_us),  # HIGH
+            pigpio.pulse(0,              1 << self.PUL_pin, half_period_us),  # LOW
+        ]
+        self.pi.wave_add_generic(pulses)
+        wave_id = self.pi.wave_create()
+        if wave_id < 0:
+            raise RuntimeError(f"wave_create()に失敗しました。エラーコード: {wave_id}")
+        return wave_id
 
 
     # --- Flaskから呼び出される「公開」関数 ---
+
     def start_rotation(self):
         """モーターの回転を開始する"""
-        if self.is_running: # TrueやFalseといったbool値は ==Trueを省略するのが一般的
+        if self.is_running:
             print("MotorController: 既に回転中です。")
-            return False # 既に動いているという報告をするだけ
+            return False
 
-        print("MotorController: 回転スレッドを開始します。")
-        self.is_running = True # 停止フラグを True に
-        self.motor_thread = threading.Thread(target=self._motor_loop)
-        self.motor_thread.start()
+        print("MotorController: 回転を開始します。")
+        self._motor_enable(True)
+        self._wave_id = self._create_wave()
+        self.pi.wave_send_repeat(self._wave_id)  # 停止命令が来るまで繰り返し再生
+        self.is_running = True
         return True
 
     def stop_rotation(self):
         """モーターの回転を停止させる"""
-        if not self.is_running: # TrueやFalseといったbool値は notをつけるのが一般的
+        if not self.is_running:
             print("MotorController: 既に停止しています。")
             return
 
-        print("MotorController: 停止フラグを立てます。")
-        self.is_running = False # 停止フラグを False に
-        self.motor_thread.join() # スレッドの終了を待つ
+        print("MotorController: 停止します。")
+        self.pi.wave_tx_stop()
+        if self._wave_id >= 0:
+            self.pi.wave_delete(self._wave_id)
+            self._wave_id = -1
+        self._motor_enable(False)
+        self.is_running = False
 
     def set_speed(self, delay):
-        '''モーター速度を設定'''
+        """モーター速度を設定する"""
         self.motor_delay = delay
         print(f"MotorController: 速度を {delay} に変更しました。")
+        if self.is_running:
+            # 回転中の場合は新しい速度で波形を即座に差し替える
+            self.pi.wave_tx_stop()
+            if self._wave_id >= 0:
+                self.pi.wave_delete(self._wave_id)
+            self._wave_id = self._create_wave()
+            self.pi.wave_send_repeat(self._wave_id)
 
     def get_status(self):
         """現在の状態を辞書で返す"""
-        #temp = alert.get_cpu_temp()
         return {
             "motor_is_running": self.is_running,
             "current_speed_delay": self.motor_delay,
-            #"cpu_temp": f"{temp:.2f}"
         }
 
     def cleanup(self):
-        """GPIOをクリーンアップする"""
+        """リソースをクリーンアップする"""
         print("MotorController: クリーンアップを実行します。")
-        self.stop_rotation() # 念のためモーターを止める
-        time.sleep(0.1) # スレッドが止まるのを少し待つ
-        GPIO.cleanup()
+        self.stop_rotation()
+        self.pi.stop()  # pigpioデーモンとの接続を切断
