@@ -8,8 +8,12 @@
 
 ## 手順
 1. ラズパイとPCを同じローカルネットワークにつなげる(ラズパイ側でホットスポットを立てる)
-2. 
+2. PC側でmainを実行
 
 ## プログラム解説
-### server_app_ver2.py
-### turntable_control.py
+### main_raspi.py
+- ラズパイ側でずっと実行しているmainプログラム
+- Flaskで該当のURLが送られてくるたび各動作を行う
+  
+### module_turntable_control.py
+- モータの各処理を担当するmodule
